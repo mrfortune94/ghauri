@@ -18,7 +18,15 @@
 
 Ghauri is now available as an Android application with a user-friendly GUI! Test for SQL injection vulnerabilities directly from your Android device.
 
-**[📖 Read the Android Build Guide](ANDROID_BUILD.md)** for instructions on building the APK.
+### Quick Download
+
+**🚀 Pre-built APKs available!** The APK is automatically built via GitHub Actions.
+
+1. Go to [GitHub Actions](../../actions/workflows/build-apk.yml)
+2. Download the latest APK from workflow artifacts
+3. Install on your Android device
+
+**[📖 Read the Android Build Guide](ANDROID_BUILD.md)** for manual build instructions.
 
 ### Key Features of Android App:
 - 📱 Mobile-friendly tabbed interface
@@ -26,6 +34,7 @@ Ghauri is now available as an Android application with a user-friendly GUI! Test
 - ⚙️ Advanced configuration options
 - 📊 Real-time results display
 - 🔒 Secure on-device execution
+- 🤖 **Automated builds** via GitHub Actions
 
 ## ***Requirements***
 

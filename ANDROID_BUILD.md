@@ -2,11 +2,40 @@
 
 This document provides instructions on how to build the Ghauri SQL Injection Tool as an Android APK using Kivy and Buildozer.
 
+## 🚀 Quick Start: Automated Builds
+
+**NEW:** The APK is now built automatically via GitHub Actions!
+
+### Download Pre-built APK
+
+1. Go to the [Actions tab](../../actions/workflows/build-apk.yml)
+2. Click on the latest successful workflow run
+3. Scroll to **Artifacts** section
+4. Download `ghauri-android-apk`
+5. Extract and install the APK on your Android device
+
+**Build time:** ~20-30 minutes (with cache) | **Artifact retention:** 30 days
+
+### Automated Build Triggers
+
+The APK builds automatically when:
+- Code is pushed to `main`, `master`, `develop`, or `copilot/*` branches
+- Pull requests are created/updated
+- Manually triggered via workflow dispatch
+
+---
+
 ## Overview
 
 The Ghauri Android app is a mobile version of the Ghauri SQL injection detection and exploitation tool. It provides a user-friendly graphical interface for security professionals to test web applications for SQL injection vulnerabilities directly from their Android devices.
 
-## Prerequisites
+---
+
+## Manual Build (Local)
+
+If you want to build the APK locally instead of using automated builds:
+
+### Prerequisites
 
 ### For Building the APK
 
