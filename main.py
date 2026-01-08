@@ -22,14 +22,16 @@ from kivy.clock import Clock
 import threading
 import sys
 import io
+import traceback
 from contextlib import redirect_stdout, redirect_stderr
 
 # Import Ghauri modules
+GHAURI_IMPORT_ERROR = None
 try:
     import ghauri
     from ghauri.logger.colored_logger import logger
 except ImportError as e:
-    print(f"Error importing ghauri: {e}")
+    GHAURI_IMPORT_ERROR = str(e)
     ghauri = None
 
 
@@ -319,7 +321,8 @@ class GhauriApp(App):
     def run_scan(self, instance):
         """Run the Ghauri scan in a separate thread"""
         if not ghauri:
-            self.append_to_results("Error: Ghauri module not loaded")
+            error_msg = f"Error: Ghauri module not loaded\n{GHAURI_IMPORT_ERROR if GHAURI_IMPORT_ERROR else 'Unknown import error'}"
+            self.append_to_results(error_msg)
             return
         
         url = self.url_input.text.strip()
@@ -366,64 +369,55 @@ class GhauriApp(App):
             batch = self.batch_checkbox.active
             random_agent = self.random_agent_checkbox.active
             
-            # Capture output
-            output_buffer = io.StringIO()
+            # Perform injection test (without capturing all output to avoid interfering with Kivy)
+            self.append_to_results("Testing for SQL injection vulnerabilities...")
             
-            with redirect_stdout(output_buffer), redirect_stderr(output_buffer):
-                try:
-                    # Perform injection test
-                    self.append_to_results("Testing for SQL injection vulnerabilities...")
-                    
-                    resp = ghauri.perform_injection(
-                        url=url,
-                        data=data,
-                        cookies=cookie,
-                        proxy=proxy,
-                        user_agent=user_agent,
-                        dbms=dbms,
-                        level=level,
-                        verbosity=1,
-                        techniques=technique,
-                        batch=batch,
-                        timeout=timeout,
-                        delay=delay,
-                        threads=threads,
-                        random_agent=random_agent,
-                        host="",
-                        header="",
-                        headers="",
-                        referer="",
-                        requestfile="",
-                        flush_session=False,
-                        force_ssl=False,
-                        timesec=5,
-                        testparameter=None,
-                        retries=3,
-                        prefix=None,
-                        suffix=None,
-                        code=200,
-                        string=None,
-                        not_string=None,
-                        text_only=False,
-                        skip_urlencoding=False,
-                        confirm_payloads=False,
-                        safe_chars=None,
-                        fetch_using=None,
-                        test_filter=None,
-                        sql_shell=False,
-                        fresh_queries=False,
-                        update=False,
-                        ignore_code="",
-                        bulkfile=False,
-                        mobile=False,
-                    )
-                    
-                    # Get captured output
-                    output = output_buffer.getvalue()
-                    if output:
-                        self.append_to_results(output)
-                    
-                    if resp and resp.is_injected:
+            try:
+                resp = ghauri.perform_injection(
+                    url=url,
+                    data=data,
+                    cookies=cookie,
+                    proxy=proxy,
+                    user_agent=user_agent,
+                    dbms=dbms,
+                    level=level,
+                    verbosity=1,
+                    techniques=technique,
+                    batch=batch,
+                    timeout=timeout,
+                    delay=delay,
+                    threads=threads,
+                    random_agent=random_agent,
+                    host="",
+                    header="",
+                    headers="",
+                    referer="",
+                    requestfile="",
+                    flush_session=False,
+                    force_ssl=False,
+                    timesec=5,
+                    testparameter=None,
+                    retries=3,
+                    prefix=None,
+                    suffix=None,
+                    code=200,
+                    string=None,
+                    not_string=None,
+                    text_only=False,
+                    skip_urlencoding=False,
+                    confirm_payloads=False,
+                    safe_chars=None,
+                    fetch_using=None,
+                    test_filter=None,
+                    sql_shell=False,
+                    fresh_queries=False,
+                    update=False,
+                    ignore_code="",
+                    bulkfile=False,
+                    mobile=False,
+                )
+                
+                if resp and resp.is_injected:
                         self.append_to_results("\n[SUCCESS] SQL injection found!")
                         self.append_to_results(f"Parameter: {resp.parameter}")
                         self.append_to_results(f"Backend: {resp.backend}")
@@ -489,19 +483,17 @@ class GhauriApp(App):
                                     self.append_to_results(f"\nDumped data from {db}.{table}:\n{result.result}")
                             else:
                                 self.append_to_results("\nError: Database and table names required")
-                    else:
-                        self.append_to_results("\n[INFO] No SQL injection found or unable to detect.")
-                        
-                except Exception as e:
-                    self.append_to_results(f"\nError during scan: {str(e)}")
-                    import traceback
-                    self.append_to_results(traceback.format_exc())
+                else:
+                    self.append_to_results("\n[INFO] No SQL injection found or unable to detect.")
+                    
+            except Exception as e:
+                self.append_to_results(f"\nError during scan: {str(e)}")
+                self.append_to_results(traceback.format_exc())
             
             self.append_to_results(f"\n{'='*50}\nScan completed\n{'='*50}")
             
         except Exception as e:
             self.append_to_results(f"\nFatal error: {str(e)}")
-            import traceback
             self.append_to_results(traceback.format_exc())
         finally:
             # Re-enable button
