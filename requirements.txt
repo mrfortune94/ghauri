@@ -3,3 +3,5 @@ colorama
 requests
 chardet
 ua_generator
+kivy>=2.0.0
+buildozer
