@@ -14,10 +14,26 @@
 
 ![ghauri-banner](https://user-images.githubusercontent.com/11024397/193408429-418a75e0-a070-4491-9f92-5799b2509cdf.PNG)
 
+## ***NEW: Android App Available! 📱***
+
+Ghauri is now available as an Android application with a user-friendly GUI! Test for SQL injection vulnerabilities directly from your Android device.
+
+**[📖 Read the Android Build Guide](ANDROID_BUILD.md)** for instructions on building the APK.
+
+### Key Features of Android App:
+- 📱 Mobile-friendly tabbed interface
+- 🎯 All core Ghauri functionality
+- ⚙️ Advanced configuration options
+- 📊 Real-time results display
+- 🔒 Secure on-device execution
+
 ## ***Requirements***
 
 - Python 3
 - Python `pip3`
+
+### For Android App:
+- See [ANDROID_BUILD.md](ANDROID_BUILD.md) for complete Android build requirements
 
 ## ***Installation***
 
