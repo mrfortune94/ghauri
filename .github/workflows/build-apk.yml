@@ -59,6 +59,8 @@ jobs:
             openjdk-17-jdk \
             autoconf \
             libtool \
+            libtool-bin \
+            automake \
             pkg-config \
             cmake \
             ninja-build \
@@ -93,9 +95,14 @@ jobs:
           pip install --upgrade Cython==0.29.33
           pip install -r requirements.txt
       
+      - name: Install Buildozer
+        run: |
+          pip install --upgrade buildozer
+          pip install python-for-android==2024.1.21
+      
       - name: Build APK with Buildozer
         run: |
-          buildozer android debug
+          buildozer -v android debug || buildozer -v android debug
         timeout-minutes: 90
       
       - name: List build output
