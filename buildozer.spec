@@ -39,9 +39,8 @@ android.minapi = 21
 # (str) Android NDK version to use
 android.ndk = 25b
 
-# ✅ Explicit NDK path to avoid permission errors
-# Adjust folder name if unzip produces "android-ndk-r25b-linux"
-android.ndk_path = /home/runner/.buildozer/android/platform/android-ndk-r25b
+# NDK path will be auto-detected from ANDROID_NDK_HOME environment variable
+#android.ndk_path =
 
 # (str) Android SDK directory (if empty, it will be automatically downloaded.)
 #android.sdk_path =
