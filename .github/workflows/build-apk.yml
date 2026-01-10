@@ -104,8 +104,10 @@ jobs:
       
       - name: Build APK with Buildozer
         run: |
-          buildozer -v android debug || buildozer -v android debug
-        timeout-minutes: 90
+          buildozer android clean || true
+          buildozer -v android debug 2>&1 | tee build.log || \
+          buildozer -v android debug 2>&1 | tee build.log
+        timeout-minutes: 120
       
       - name: List build output
         if: always()
