@@ -67,7 +67,6 @@ jobs:
             ccache \
             zip \
             unzip \
-            libltdl-dev \
             m4 \
             gettext
       
@@ -101,7 +100,7 @@ jobs:
       - name: Install Buildozer
         run: |
           pip install --upgrade buildozer
-          pip install --upgrade python-for-android
+          pip install python-for-android
       
       - name: Build APK with Buildozer
         run: |
