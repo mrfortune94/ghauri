@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout repo
@@ -38,9 +38,7 @@ jobs:
             automake \
             libtool \
             pkg-config \
-            ant
-            libtool \
-            pkg-config \
+            ant \
             cmake \
             ninja-build \
             ccache \
@@ -103,13 +101,6 @@ jobs:
           echo "Build directory contents:"
           ls -la bin/ || echo "No bin directory"
           find . -name "*.apk" || echo "No APK files found"
-            zlib1g-dev \
-            libncurses5-dev \
-            libncursesw5-dev \
-            libtinfo5 \
-            cmake \
-            libffi-dev \
-            libssl-dev
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -158,13 +149,6 @@ jobs:
           echo "=== Listing bin directory ==="
           ls -la bin/ || echo "bin directory not found"
           find . -name "*.apk" -type f
-            zlib1g-dev \
-            libncurses5-dev \
-            autoconf \
-            automake \
-            libtool \
-            pkg-config \
-            cmake
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
