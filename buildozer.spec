@@ -42,6 +42,13 @@ android.ndk = 25c
 # ✅ Explicit NDK path to avoid permission errors
 # Adjust folder name if unzip produces "android-ndk-r25b-linux"
 android.ndk_path = /home/runner/android-sdk/ndk/25.2.9519653
+# NDK path is auto-detected from ANDROID_NDK_HOME environment variable
+# No need to hardcode the path here
+#android.ndk_path =
+# NDK path will be auto-detected from ANDROID_NDK_HOME environment variable
+#android.ndk_path =
+# Let buildozer auto-detect NDK path from ANDROID_NDK_HOME
+# android.ndk_path =
 
 # (str) Android SDK directory (if empty, it will be automatically downloaded.)
 android.sdk_path = /home/runner/android-sdk
