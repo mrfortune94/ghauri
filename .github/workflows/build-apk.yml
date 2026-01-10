@@ -102,13 +102,35 @@ jobs:
           pip install --upgrade buildozer
           pip install python-for-android
       
-      - name: Install Android SDK API 31
+      - name: Install Android SDK API 33 and NDK 25b
         run: |
-          echo "=== Installing Android SDK API 31 ==="
+          echo "=== Installing Android SDK API 33 and NDK 25b ==="
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-31" "build-tools;31.0.0"
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-33" "build-tools;33.0.2" "ndk;25.2.9519653"
           echo "=== Verifying Android SDK installation ==="
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --list | grep -E "android-31|31.0.0"
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --list | grep -E "android-33|33.0|ndk"
+          echo "=== Setting NDK path to installed version ==="
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
+      
+      - name: Configure Buildozer SDK paths
+        run: |
+          # Configure buildozer to use the system SDK and NDK
+          # This prevents buildozer from downloading its own SDK
+          echo "ANDROIDSDK=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROIDNDK=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
+          # Also set the p4a-specific environment variables
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
+          # Set APP_ prefixed variables for buildozer spec override
+          echo "APP_ANDROID_SDK_PATH=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "APP_ANDROID_NDK_PATH=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
+          
+          # Verify the paths exist
+          echo "=== Verifying SDK/NDK paths ==="
+          echo "ANDROID_HOME: $ANDROID_HOME"
+          ls -la $ANDROID_HOME/platforms/ || echo "No platforms found in system SDK"
+          echo "ANDROID_NDK: $ANDROID_HOME/ndk/25.2.9519653"
+          ls -la $ANDROID_HOME/ndk/25.2.9519653 || echo "NDK not found"
       
       - name: Build APK with Buildozer
         run: |
@@ -116,6 +138,11 @@ jobs:
           buildozer -v android debug 2>&1 | tee build.log || \
           buildozer -v android debug 2>&1 | tee build.log
         timeout-minutes: 120
+        env:
+          ANDROIDSDK: ${{ env.ANDROID_HOME }}
+          ANDROIDNDK: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
+          APP_ANDROID_SDK_PATH: ${{ env.ANDROID_HOME }}
+          APP_ANDROID_NDK_PATH: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
       
       - name: Locate and copy APK files
         id: copy-apk
