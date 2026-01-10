@@ -109,6 +109,47 @@ jobs:
           buildozer -v android debug 2>&1 | tee build.log
         timeout-minutes: 120
       
+      - name: Locate and copy APK files
+        id: copy-apk
+        run: |
+          echo "=== Searching for APK files in buildozer output ==="
+          find .buildozer -name "*.apk" -type f
+          
+          echo ""
+          echo "=== Creating bin directory ==="
+          mkdir -p bin
+          
+          echo ""
+          echo "=== Copying APK files to bin/ ==="
+          APK_COUNT=$(find .buildozer -name "*.apk" -type f | wc -l)
+          echo "Found $APK_COUNT APK file(s)"
+          
+          if [ "$APK_COUNT" -eq 0 ]; then
+            echo "ERROR: No APK files found after build!"
+            echo "Build completed but no APK was produced."
+            echo ""
+            echo "=== Buildozer output directory structure ==="
+            find .buildozer -type d -name "apk" 2>/dev/null || echo "No apk directories found"
+            exit 1
+          fi
+          
+          # Copy all APKs to bin/
+          find .buildozer -name "*.apk" -type f -exec cp -v {} bin/ \;
+          
+          echo ""
+          echo "=== Verifying APK files in bin/ ==="
+          if ! ls bin/*.apk 1> /dev/null 2>&1; then
+            echo "ERROR: APK files were not copied successfully to bin/"
+            exit 1
+          fi
+          
+          echo ""
+          echo "=== APK files ready for upload ==="
+          ls -lh bin/*.apk
+          
+          # Set output for later steps
+          echo "apk-found=true" >> $GITHUB_OUTPUT
+      
       - name: List build output
         if: always()
         run: |
@@ -120,7 +161,7 @@ jobs:
       
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
-        if: success()
+        if: steps.copy-apk.outputs.apk-found == 'true'
         with:
           name: ghauri-android-apk
           path: bin/*.apk
@@ -135,7 +176,7 @@ jobs:
           retention-days: 7
       
       - name: Get APK info
-        if: success()
+        if: steps.copy-apk.outputs.apk-found == 'true'
         run: |
           APK_FILE=$(find bin -name "*.apk" -type f | head -1)
           if [ -n "$APK_FILE" ]; then
@@ -145,12 +186,19 @@ jobs:
             echo "APK Path: $APK_FILE"
             echo "APK Size: $(du -h $APK_FILE | cut -f1)"
             echo ""
+            # Verify APK is not empty
+            APK_SIZE=$(stat -c%s "$APK_FILE")
+            if [ "$APK_SIZE" -lt 1000000 ]; then
+              echo "WARNING: APK size is unusually small ($APK_SIZE bytes)"
+            else
+              echo "✅ APK appears to be valid (size: $APK_SIZE bytes)"
+            fi
             # Save APK path for potential release
             echo "APK_PATH=$APK_FILE" >> $GITHUB_ENV
           fi
       
       - name: Comment on PR with APK info
-        if: success() && github.event_name == 'pull_request'
+        if: steps.copy-apk.outputs.apk-found == 'true' && github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
