@@ -31,6 +31,7 @@ jobs:
             git \
             libssl-dev \
             libffi-dev \
+            python3-dev \
             build-essential \
             python3-pip \
             autoconf \
@@ -91,6 +92,54 @@ jobs:
           echo "=== Listing bin directory ==="
           ls -la bin/ || echo "bin directory not found"
           find . -name "*.apk" -type f
+            zlib1g-dev \
+            libncurses5-dev \
+            autoconf \
+            automake \
+            libtool \
+            pkg-config \
+            cmake
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            platform-tools
+            platforms;android-33
+            build-tools;33.0.2
+            ndk;25.1.8937393
+
+      - name: Persist Android environment
+        run: |
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/25.1.8937393" >> $GITHUB_ENV
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install buildozer cython==0.29.36
+
+      - name: Cache Buildozer directory
+        uses: actions/cache@v4
+        with:
+          path: .buildozer
+          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec', 'requirements.txt') }}
+
+      - name: Build with Buildozer (debug)
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+        run: |
+          buildozer android debug
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          ls -la bin || true
+          ls -la .buildozer/android/platform || true
+          find . -maxdepth 3 -type f -name "*.log" -print || true
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
