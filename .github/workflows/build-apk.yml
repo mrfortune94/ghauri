@@ -35,6 +35,10 @@ jobs:
             build-essential \
             python3-pip \
             autoconf \
+            automake \
+            libtool \
+            pkg-config \
+            ant
             libtool \
             pkg-config \
             cmake \
@@ -190,6 +194,8 @@ jobs:
 
       - name: Build with Buildozer (debug)
         env:
+          ANDROID_HOME: ${{ env.HOME }}/android-sdk
+          ANDROID_NDK_HOME: ${{ env.HOME }}/android-sdk/ndk/25.2.9519653
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
           ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}

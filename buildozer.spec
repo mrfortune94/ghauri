@@ -37,8 +37,11 @@ android.api = 33
 android.minapi = 21
 
 # (str) Android NDK version to use
-android.ndk = 25b
+android.ndk = 25c
 
+# ✅ Explicit NDK path to avoid permission errors
+# Adjust folder name if unzip produces "android-ndk-r25b-linux"
+android.ndk_path = /home/runner/android-sdk/ndk/25.2.9519653
 # NDK path is auto-detected from ANDROID_NDK_HOME environment variable
 # No need to hardcode the path here
 #android.ndk_path =
@@ -48,10 +51,10 @@ android.ndk = 25b
 # android.ndk_path =
 
 # (str) Android SDK directory (if empty, it will be automatically downloaded.)
-#android.sdk_path =
+android.sdk_path = /home/runner/android-sdk
 
 # (str) ANT directory (if empty, it will be automatically downloaded.)
-#android.ant_path =
+android.ant_path = /usr/bin/ant
 
 android.accept_sdk_license = True
 
