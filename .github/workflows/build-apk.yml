@@ -102,6 +102,14 @@ jobs:
           pip install --upgrade buildozer
           pip install python-for-android
       
+      - name: Install Android SDK API 31
+        run: |
+          echo "=== Installing Android SDK API 31 ==="
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-31" "build-tools;31.0.0"
+          echo "=== Verifying Android SDK installation ==="
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --list | grep -E "android-31|31.0.0"
+      
       - name: Build APK with Buildozer
         run: |
           buildozer android clean || true
