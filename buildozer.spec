@@ -39,6 +39,9 @@ android.minapi = 21
 # (str) Android NDK version to use
 android.ndk = 25b
 
+# NDK path is auto-detected from ANDROID_NDK_HOME environment variable
+# No need to hardcode the path here
+#android.ndk_path =
 # NDK path will be auto-detected from ANDROID_NDK_HOME environment variable
 #android.ndk_path =
 # Let buildozer auto-detect NDK path from ANDROID_NDK_HOME
