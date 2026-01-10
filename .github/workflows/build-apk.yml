@@ -172,7 +172,7 @@ jobs:
         if: failure()
         with:
           name: buildozer-logs
-          path: .buildozer/logs/
+          path: build.log
           retention-days: 7
       
       - name: Get APK info
