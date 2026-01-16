@@ -136,7 +136,11 @@ jobs:
           # Create a keystore directory
           mkdir -p ~/.android
           # Generate a self-signed keystore for release builds
-          # In production, use GitHub secrets to provide a real keystore
+          # NOTE: This is for CI/testing only. For production releases:
+          # 1. Generate a proper keystore locally: keytool -genkeypair -v -keystore my-release-key.jks ...
+          # 2. Store keystore in GitHub secrets (base64 encoded)
+          # 3. Update this step to decode and use the secret keystore
+          # The 'android' password is standard for CI auto-generated keystores
           keytool -genkeypair -v \
             -keystore ~/.android/release.keystore \
             -alias ghauri-release \
@@ -168,34 +172,58 @@ jobs:
 
       - name: Sign Release APK
         run: |
-          # Find the unsigned release APK
-          UNSIGNED_APK=$(find bin/ -name "*-release-unsigned.apk" | head -1)
-          if [ -n "$UNSIGNED_APK" ]; then
-            echo "Found unsigned APK: $UNSIGNED_APK"
-            # Get the base name without extension
-            BASE_NAME=$(basename "$UNSIGNED_APK" -unsigned.apk)
-            SIGNED_APK="bin/${BASE_NAME}.apk"
+          echo "Signing release APKs..."
+          # Find all unsigned release APKs (buildozer creates one per architecture)
+          UNSIGNED_APKS=$(find bin/ -name "*-release-unsigned.apk")
+          
+          if [ -n "$UNSIGNED_APKS" ]; then
+            echo "Found unsigned release APKs:"
+            echo "$UNSIGNED_APKS"
             
-            # Align the APK
-            zipalign -v -p 4 "$UNSIGNED_APK" "${UNSIGNED_APK%.apk}-aligned.apk"
+            # Sign each unsigned APK
+            echo "$UNSIGNED_APKS" | while read -r UNSIGNED_APK; do
+              echo "Processing: $UNSIGNED_APK"
+              # Get the base name without -unsigned.apk suffix
+              BASE_NAME=$(basename "$UNSIGNED_APK" -unsigned.apk)
+              SIGNED_APK="bin/${BASE_NAME}.apk"
+              ALIGNED_APK="${UNSIGNED_APK%.apk}-aligned.apk"
+              
+              # Align the APK
+              echo "Aligning APK..."
+              zipalign -v -p 4 "$UNSIGNED_APK" "$ALIGNED_APK"
+              
+              # Sign the APK
+              echo "Signing APK..."
+              apksigner sign --ks ~/.android/release.keystore \
+                --ks-key-alias ghauri-release \
+                --ks-pass pass:android \
+                --key-pass pass:android \
+                --out "$SIGNED_APK" \
+                "$ALIGNED_APK"
+              
+              # Verify the signature
+              echo "Verifying signature..."
+              apksigner verify "$SIGNED_APK"
+              echo "✓ Signed APK created: $SIGNED_APK"
+              
+              # Clean up temporary aligned APK
+              rm -f "$ALIGNED_APK"
+            done
             
-            # Sign the APK
-            apksigner sign --ks ~/.android/release.keystore \
-              --ks-key-alias ghauri-release \
-              --ks-pass pass:android \
-              --key-pass pass:android \
-              --out "$SIGNED_APK" \
-              "${UNSIGNED_APK%.apk}-aligned.apk"
-            
-            # Verify the signature
-            apksigner verify "$SIGNED_APK"
-            echo "Signed APK: $SIGNED_APK"
+            echo "All release APKs signed successfully"
           else
-            echo "No unsigned release APK found, checking if already signed..."
-            RELEASE_APK=$(find bin/ -name "*-release.apk" | head -1)
-            if [ -n "$RELEASE_APK" ]; then
-              echo "Release APK already signed: $RELEASE_APK"
-              apksigner verify "$RELEASE_APK" || echo "Warning: APK signature verification failed"
+            echo "No unsigned release APKs found, checking for already signed APKs..."
+            RELEASE_APKS=$(find bin/ -name "*-release.apk" ! -name "*-unsigned.apk")
+            if [ -n "$RELEASE_APKS" ]; then
+              echo "Found signed release APKs:"
+              echo "$RELEASE_APKS"
+              # Verify signatures
+              echo "$RELEASE_APKS" | while read -r APK; do
+                echo "Verifying: $APK"
+                apksigner verify "$APK" || echo "Warning: APK signature verification failed for $APK"
+              done
+            else
+              echo "Warning: No release APKs found (signed or unsigned)"
             fi
           fi
 
