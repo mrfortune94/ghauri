@@ -60,13 +60,30 @@ jobs:
         run: |
           sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2" "ndk;25.2.9519653"
 
-      - name: Create SDK tools compatibility symlink
+      - name: Create SDK tools wrapper for Java 17 compatibility
         run: |
-          # Buildozer looks for tools/bin/sdkmanager but modern SDK uses cmdline-tools/latest/bin
-          mkdir -p $ANDROID_HOME/tools
-          ln -s $ANDROID_HOME/cmdline-tools/latest/bin $ANDROID_HOME/tools/bin
-          echo "Created symlink: $ANDROID_HOME/tools/bin -> $ANDROID_HOME/cmdline-tools/latest/bin"
-          ls -la $ANDROID_HOME/tools/bin/sdkmanager || echo "Warning: sdkmanager symlink not found"
+          # Python-for-android tries to use deprecated tools/bin/sdkmanager which requires JAXB (removed in Java 11+)
+          # Create wrapper scripts that call the modern cmdline-tools instead
+          mkdir -p $ANDROID_HOME/tools/bin
+          
+          # Create sdkmanager wrapper
+          cat > $ANDROID_HOME/tools/bin/sdkmanager << 'EOF'
+#!/bin/bash
+# Wrapper to use modern cmdline-tools sdkmanager instead of deprecated tools version
+exec "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "$@"
+EOF
+          chmod +x $ANDROID_HOME/tools/bin/sdkmanager
+          
+          # Create avdmanager wrapper if needed
+          cat > $ANDROID_HOME/tools/bin/avdmanager << 'EOF'
+#!/bin/bash
+# Wrapper to use modern cmdline-tools avdmanager instead of deprecated tools version
+exec "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" "$@"
+EOF
+          chmod +x $ANDROID_HOME/tools/bin/avdmanager
+          
+          echo "Created SDK tools wrappers in $ANDROID_HOME/tools/bin"
+          ls -la $ANDROID_HOME/tools/bin/
 
       - name: Accept all SDK licenses
         run: |
@@ -95,8 +112,10 @@ jobs:
           ls -la $ANDROID_HOME/
           echo "NDK directory:"
           ls -la $ANDROID_HOME/ndk/ || true
-          echo "Tools bin directory (symlink):"
+          echo "Tools bin directory (wrapper scripts):"
           ls -la $ANDROID_HOME/tools/bin/ || true
+          echo "Testing tools/bin wrapper scripts:"
+          $ANDROID_HOME/tools/bin/sdkmanager --version || echo "tools/bin/sdkmanager wrapper failed"
           echo "Cmdline tools:"
           ls -la $ANDROID_HOME/cmdline-tools/latest/bin/ || true
           echo "Build tools:"
