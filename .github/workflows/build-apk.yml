@@ -60,19 +60,55 @@ jobs:
         run: |
           sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2" "ndk;25.2.9519653"
 
+      - name: Create SDK tools compatibility symlink
+        run: |
+          # Buildozer looks for tools/bin/sdkmanager but modern SDK uses cmdline-tools/latest/bin
+          mkdir -p $ANDROID_HOME/tools
+          ln -s $ANDROID_HOME/cmdline-tools/latest/bin $ANDROID_HOME/tools/bin
+          echo "Created symlink: $ANDROID_HOME/tools/bin -> $ANDROID_HOME/cmdline-tools/latest/bin"
+          ls -la $ANDROID_HOME/tools/bin/sdkmanager || echo "Warning: sdkmanager symlink not found"
+
+      - name: Accept all SDK licenses
+        run: |
+          echo "Accepting all Android SDK licenses..."
+          yes | sdkmanager --licenses
+          echo "SDK licenses accepted successfully"
+
       - name: Set Android environment variables
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
+          echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
           echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/tools/bin" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/build-tools/33.0.2" >> $GITHUB_PATH
 
       - name: Verify Android SDK installation
         run: |
           echo "ANDROID_HOME: $ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
           echo "ANDROID_NDK_HOME: $ANDROID_NDK_HOME"
+          echo "JAVA_HOME: $JAVA_HOME"
+          echo "SDK directory structure:"
           ls -la $ANDROID_HOME/
+          echo "NDK directory:"
           ls -la $ANDROID_HOME/ndk/ || true
+          echo "Tools bin directory (symlink):"
+          ls -la $ANDROID_HOME/tools/bin/ || true
+          echo "Cmdline tools:"
+          ls -la $ANDROID_HOME/cmdline-tools/latest/bin/ || true
+          echo "Build tools:"
+          ls -la $ANDROID_HOME/build-tools/33.0.2/ || true
+          echo "Testing sdkmanager:"
+          which sdkmanager || echo "sdkmanager not in PATH"
+          sdkmanager --version || echo "sdkmanager command failed"
+          echo "Testing signing tools:"
+          which zipalign || echo "zipalign not in PATH"
+          which apksigner || echo "apksigner not in PATH"
+          zipalign -version || echo "zipalign command failed"
+          apksigner --version || echo "apksigner command failed"
 
       - name: Cache Buildozer global directory
         uses: actions/cache@v4
@@ -95,16 +131,116 @@ jobs:
           pip install --upgrade pip
           pip install buildozer cython==0.29.36
 
-      - name: Build with Buildozer
+      - name: Setup keystore for release signing
         run: |
+          # Create a keystore directory
+          mkdir -p ~/.android
+          # Generate a self-signed keystore for release builds
+          # NOTE: This is for CI/testing only. For production releases:
+          # 1. Generate a proper keystore locally: keytool -genkeypair -v -keystore my-release-key.jks ...
+          # 2. Store keystore in GitHub secrets (base64 encoded)
+          # 3. Update this step to decode and use the secret keystore
+          # The 'android' password is standard for CI auto-generated keystores
+          keytool -genkeypair -v \
+            -keystore ~/.android/release.keystore \
+            -alias ghauri-release \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass android \
+            -keypass android \
+            -dname "CN=Ghauri, OU=Security, O=Ghauri, L=Unknown, S=Unknown, C=US"
+          echo "Keystore created at ~/.android/release.keystore"
+          ls -la ~/.android/
+
+      - name: Build Debug APK
+        run: |
+          echo "Building debug APK..."
           buildozer android debug
+          echo "Debug APK build completed"
+
+      - name: Build Release APK
+        run: |
+          echo "Building release APK..."
+          # Set environment variables for signing
+          export P4A_RELEASE_KEYSTORE=~/.android/release.keystore
+          export P4A_RELEASE_KEYSTORE_PASSWD=android
+          export P4A_RELEASE_KEYALIAS_PASSWD=android
+          export P4A_RELEASE_KEYALIAS=ghauri-release
+          buildozer android release
+          echo "Release APK build completed"
+
+      - name: Sign Release APK
+        run: |
+          echo "Signing release APKs..."
+          # Find all unsigned release APKs (buildozer creates one per architecture)
+          UNSIGNED_APKS=$(find bin/ -name "*-release-unsigned.apk")
+          
+          if [ -n "$UNSIGNED_APKS" ]; then
+            echo "Found unsigned release APKs:"
+            echo "$UNSIGNED_APKS"
+            
+            # Sign each unsigned APK
+            echo "$UNSIGNED_APKS" | while read -r UNSIGNED_APK; do
+              echo "Processing: $UNSIGNED_APK"
+              # Get the base name without -unsigned.apk suffix
+              BASE_NAME=$(basename "$UNSIGNED_APK" -unsigned.apk)
+              SIGNED_APK="bin/${BASE_NAME}.apk"
+              ALIGNED_APK="${UNSIGNED_APK%.apk}-aligned.apk"
+              
+              # Align the APK
+              echo "Aligning APK..."
+              zipalign -v -p 4 "$UNSIGNED_APK" "$ALIGNED_APK"
+              
+              # Sign the APK
+              echo "Signing APK..."
+              apksigner sign --ks ~/.android/release.keystore \
+                --ks-key-alias ghauri-release \
+                --ks-pass pass:android \
+                --key-pass pass:android \
+                --out "$SIGNED_APK" \
+                "$ALIGNED_APK"
+              
+              # Verify the signature
+              echo "Verifying signature..."
+              apksigner verify "$SIGNED_APK"
+              echo "✓ Signed APK created: $SIGNED_APK"
+              
+              # Clean up temporary aligned APK
+              rm -f "$ALIGNED_APK"
+            done
+            
+            echo "All release APKs signed successfully"
+          else
+            echo "No unsigned release APKs found, checking for already signed APKs..."
+            RELEASE_APKS=$(find bin/ -name "*-release.apk" ! -name "*-unsigned.apk")
+            if [ -n "$RELEASE_APKS" ]; then
+              echo "Found signed release APKs:"
+              echo "$RELEASE_APKS"
+              # Verify signatures
+              echo "$RELEASE_APKS" | while read -r APK; do
+                echo "Verifying: $APK"
+                apksigner verify "$APK" || echo "Warning: APK signature verification failed for $APK"
+              done
+            else
+              echo "Warning: No release APKs found (signed or unsigned)"
+            fi
+          fi
 
       - name: Show build output
         if: always()
         run: |
           echo "Build directory contents:"
           ls -la bin/ || echo "No bin directory"
-          find . -name "*.apk" || echo "No APK files found"
+          echo ""
+          echo "All APK files:"
+          find . -name "*.apk" -exec ls -lh {} \; || echo "No APK files found"
+          echo ""
+          echo "Debug APKs:"
+          find bin/ -name "*-debug.apk" -exec ls -lh {} \; || echo "No debug APK found"
+          echo ""
+          echo "Release APKs:"
+          find bin/ -name "*-release*.apk" -exec ls -lh {} \; || echo "No release APK found"
 
       - name: Diagnostics on failure
         if: failure()
@@ -113,17 +249,30 @@ jobs:
           ls -la .buildozer/android/platform || true
           find . -maxdepth 3 -type f -name "*.log" -print || true
 
-      - name: Upload APK artifact
+      - name: Upload Debug APK artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ghauri-apk
-          path: bin/*.apk
-          if-no-files-found: error
+          name: ghauri-debug-apk
+          path: bin/*-debug.apk
+          if-no-files-found: warn
+
+      - name: Upload Release APK artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghauri-release-apk
+          path: |
+            bin/*-release.apk
+            !bin/*-release-unsigned.apk
+          if-no-files-found: warn
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: bin/*.apk
+          files: |
+            bin/*-debug.apk
+            bin/*-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
