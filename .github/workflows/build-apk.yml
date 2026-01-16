@@ -112,8 +112,10 @@ EOF
           ls -la $ANDROID_HOME/
           echo "NDK directory:"
           ls -la $ANDROID_HOME/ndk/ || true
-          echo "Tools bin directory (symlink):"
+          echo "Tools bin directory (wrapper scripts):"
           ls -la $ANDROID_HOME/tools/bin/ || true
+          echo "Testing tools/bin wrapper scripts:"
+          $ANDROID_HOME/tools/bin/sdkmanager --version || echo "tools/bin/sdkmanager wrapper failed"
           echo "Cmdline tools:"
           ls -la $ANDROID_HOME/cmdline-tools/latest/bin/ || true
           echo "Build tools:"
