@@ -70,7 +70,9 @@ jobs:
 
       - name: Accept all SDK licenses
         run: |
-          yes | sdkmanager --licenses || true
+          echo "Accepting all Android SDK licenses..."
+          yes | sdkmanager --licenses
+          echo "SDK licenses accepted successfully"
 
       - name: Set Android environment variables
         run: |
