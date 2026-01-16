@@ -22,7 +22,8 @@ source.exclude_dirs = tests, bin, .git, .github, __pycache__
 version = 1.4.3
 
 # (list) Application requirements
-requirements = python3,kivy,tldextract,colorama,requests,chardet,ua_generator,certifi,urllib3,idna,charset-normalizer
+# Note: pysocks is required for SOCKS5 proxy support (Orbot/Tor integration)
+requirements = python3,kivy,tldextract,colorama,requests,chardet,ua_generator,certifi,urllib3,idna,charset-normalizer,pysocks
 
 # (str) Supported orientation
 orientation = portrait

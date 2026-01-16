@@ -5,3 +5,4 @@ chardet
 ua_generator
 kivy>=2.0.0
 buildozer
+pysocks>=1.7.1

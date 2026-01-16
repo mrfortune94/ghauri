@@ -233,6 +233,92 @@ For faster scanning:
 
 ---
 
+## Tor/Orbot Integration (Anonymous Testing)
+
+Ghauri Android app supports routing all traffic through the Tor network using Orbot (the official Tor app for Android). This provides enhanced anonymity and privacy during security testing.
+
+### Prerequisites
+
+1. **Install Orbot**: Download and install [Orbot](https://play.google.com/store/apps/details?id=org.torproject.android) from Google Play Store or F-Droid.
+2. **Start Orbot**: Open Orbot and tap "Start" to connect to the Tor network.
+3. **Wait for Connection**: Ensure Orbot shows "Connected to Tor network" before proceeding.
+
+### Enabling Tor Routing
+
+1. Navigate to the **Tor** tab in Ghauri
+2. Configure the settings:
+   - **Enable Tor Routing**: Check this to route traffic through Tor
+   - **Fail-Closed Mode**: (Recommended) Check this to block all network access if Tor disconnects
+   - **SOCKS Host**: Default is `127.0.0.1` (localhost)
+   - **SOCKS Port**: Default is `9050` (Orbot's default port)
+3. Tap **Test Tor Connection** to verify connectivity
+4. Tap **Save Tor Settings** to apply
+
+### Connection Testing
+
+Before running scans, always test your Tor connection:
+
+1. Tap **Test Tor Connection**
+2. Check the Results tab for connection status:
+   ```
+   [TOR] Testing Orbot connection at 127.0.0.1:9050...
+   [TOR] Orbot SOCKS5 proxy is accessible!
+   [TOR] Successfully verified Tor network connection!
+   ```
+
+### Fail-Closed Mode (Recommended)
+
+When **Fail-Closed Mode** is enabled:
+- ✅ All traffic is forced through Tor
+- ✅ If Tor disconnects, network access is blocked
+- ✅ Prevents accidental IP leaks
+- ✅ Scans abort if Tor is unavailable
+
+This is the **most secure** option and is recommended for:
+- Security research requiring anonymity
+- Testing from sensitive locations
+- Avoiding target-side IP logging
+
+### Using Tor with Scans
+
+Once Tor is configured and enabled:
+
+1. Go to the **Basic** tab
+2. Enter your target URL
+3. Run the scan as normal
+4. Traffic will automatically route through Tor
+
+**Note**: The Advanced tab's Proxy field is ignored when Tor routing is enabled, unless you specifically need to chain proxies.
+
+### Troubleshooting Tor Connection
+
+#### "Orbot not running" Error
+- Ensure Orbot is installed and running
+- Check that Orbot shows "Connected" status
+- Verify the SOCKS port (default: 9050)
+
+#### "Tor network error" Error
+- Orbot may still be bootstrapping - wait a moment
+- Check your internet connection
+- Try restarting Orbot
+
+#### Slow Scans Through Tor
+- Tor adds latency - this is normal
+- Increase timeout in Advanced settings (60-120 seconds)
+- Reduce thread count to 1-2
+
+### Security Considerations
+
+⚠️ **Important Security Notes:**
+
+1. **Use Orbot (Official Tor)**: Never use unofficial Tor implementations
+2. **Enable Fail-Closed**: Prevents IP leaks if Tor disconnects
+3. **App-Level Routing**: Only Ghauri traffic goes through Tor, not your entire device
+4. **DNS Leaks**: Ghauri uses SOCKS5h (remote DNS resolution) to prevent DNS leaks
+5. **Check Status**: Always verify Tor connection before sensitive operations
+
+---
+
 ## Real-World Example Workflow
 
 Here's a complete workflow for testing a vulnerable application:
