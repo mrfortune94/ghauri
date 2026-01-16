@@ -24,8 +24,15 @@ Copyright (c) 2016-2025 Nasir Khan (r0ot h3x49)
 import socket
 from collections import namedtuple
 from urllib.request import ProxyHandler
-from urllib.parse import urlparse
-import socks  # PySocks library for SOCKS proxy support
+
+# PySocks library for SOCKS proxy support
+try:
+    import socks
+except ImportError:
+    raise ImportError(
+        "PySocks library is required for Tor/Orbot integration. "
+        "Install it with: pip install pysocks"
+    )
 
 # Default Orbot SOCKS5 proxy settings
 DEFAULT_ORBOT_HOST = "127.0.0.1"
@@ -253,7 +260,7 @@ class OrbotManager:
                     test_socket.close()
                     self._verified = True
                     return True
-                except Exception:
+                except (socket.error, socket.timeout, OSError, ConnectionError):
                     continue
             
             test_socket.close()
@@ -272,7 +279,7 @@ class OrbotManager:
                     "Network access blocked due to fail-closed mode."
                 )
             return False
-        except Exception as e:
+        except (socket.error, socket.timeout, OSError, ConnectionError) as e:
             if self._fail_closed:
                 raise TorNetworkError(
                     f"Tor connection verification failed: {str(e)}. "

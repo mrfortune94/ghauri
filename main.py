@@ -473,7 +473,16 @@ class GhauriApp(App):
         """Test Tor connection in background thread."""
         try:
             host = self.tor_host_input.text.strip() or "127.0.0.1"
-            port = int(self.tor_port_input.text.strip() or "9050")
+            port_text = self.tor_port_input.text.strip() or "9050"
+            
+            try:
+                port = int(port_text)
+                if port < 1 or port > 65535:
+                    raise ValueError("Port out of range")
+            except ValueError:
+                self.update_tor_status("Invalid port number", error=True)
+                self.append_to_results(f"\n[TOR] Error: Invalid port '{port_text}'. Port must be between 1-65535.")
+                return
             
             self.update_tor_status("Testing connection...", warning=True)
             self.append_to_results(f"\n[TOR] Testing Orbot connection at {host}:{port}...")
@@ -505,9 +514,6 @@ class GhauriApp(App):
         except TorNetworkError as e:
             self.update_tor_status("Tor network error", error=True)
             self.append_to_results(f"[TOR] Error: {str(e)}")
-        except Exception as e:
-            self.update_tor_status("Connection test failed", error=True)
-            self.append_to_results(f"[TOR] Error: {str(e)}")
     
     def save_tor_settings(self, instance):
         """Save and apply Tor settings."""
@@ -516,12 +522,22 @@ class GhauriApp(App):
             self.append_to_results("\n[TOR] Error: Orbot module not loaded.")
             return
         
+        host = self.tor_host_input.text.strip() or "127.0.0.1"
+        port_text = self.tor_port_input.text.strip() or "9050"
+        
         try:
-            host = self.tor_host_input.text.strip() or "127.0.0.1"
-            port = int(self.tor_port_input.text.strip() or "9050")
-            enabled = self.tor_enabled_checkbox.active
-            fail_closed = self.fail_closed_checkbox.active
-            
+            port = int(port_text)
+            if port < 1 or port > 65535:
+                raise ValueError("Port out of range")
+        except ValueError:
+            self.update_tor_status("Invalid port number", error=True)
+            self.append_to_results(f"\n[TOR] Error: Invalid port '{port_text}'. Port must be between 1-65535.")
+            return
+        
+        enabled = self.tor_enabled_checkbox.active
+        fail_closed = self.fail_closed_checkbox.active
+        
+        try:
             if enabled:
                 try:
                     enable_tor_routing(host=host, port=port, fail_closed=fail_closed)
@@ -537,13 +553,9 @@ class GhauriApp(App):
                 disable_tor_routing()
                 self.update_tor_status("Disabled")
                 self.append_to_results("\n[TOR] Tor routing disabled")
-                
-        except ValueError as e:
-            self.update_tor_status("Invalid settings", error=True)
-            self.append_to_results(f"\n[TOR] Error: Invalid port number")
-        except Exception as e:
-            self.update_tor_status("Settings error", error=True)
-            self.append_to_results(f"\n[TOR] Error saving settings: {str(e)}")
+        except TorNetworkError as e:
+            self.update_tor_status("Tor network error", error=True)
+            self.append_to_results(f"\n[TOR] Error: {str(e)}")
 
     def on_action_change(self, spinner, text):
         """Handle action selection changes to show/hide relevant fields"""
