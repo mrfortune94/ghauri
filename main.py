@@ -27,12 +27,30 @@ from contextlib import redirect_stdout, redirect_stderr
 
 # Import Ghauri modules
 GHAURI_IMPORT_ERROR = None
+ORBOT_IMPORT_ERROR = None
 try:
     import ghauri
     from ghauri.logger.colored_logger import logger
 except ImportError as e:
     GHAURI_IMPORT_ERROR = str(e)
     ghauri = None
+
+# Import Orbot integration module
+try:
+    from ghauri.common.orbot import (
+        orbot_manager,
+        enable_tor_routing,
+        disable_tor_routing,
+        get_tor_status,
+        get_tor_proxy_for_requests,
+        OrbotNotRunningError,
+        TorNetworkError,
+        DEFAULT_ORBOT_HOST,
+        DEFAULT_ORBOT_PORT,
+    )
+except ImportError as e:
+    ORBOT_IMPORT_ERROR = str(e)
+    orbot_manager = None
 
 
 class GhauriApp(App):
@@ -73,6 +91,11 @@ class GhauriApp(App):
         results_tab = TabbedPanelItem(text='Results')
         results_tab.add_widget(self.create_results_tab())
         tab_panel.add_widget(results_tab)
+        
+        # Tor Settings Tab
+        tor_tab = TabbedPanelItem(text='Tor')
+        tor_tab.add_widget(self.create_tor_tab())
+        tab_panel.add_widget(tor_tab)
         
         main_layout.add_widget(tab_panel)
         
@@ -287,6 +310,253 @@ class GhauriApp(App):
         
         return layout
     
+    def create_tor_tab(self):
+        """Create the Tor/Orbot settings tab"""
+        layout = BoxLayout(orientation='vertical', padding=10, spacing=10)
+        
+        scroll = ScrollView(size_hint=(1, 1))
+        scroll_layout = GridLayout(cols=1, spacing=10, size_hint_y=None)
+        scroll_layout.bind(minimum_height=scroll_layout.setter('height'))
+        
+        # Tor Settings Header
+        header_label = Label(
+            text='[b]Orbot / Tor Settings[/b]',
+            markup=True,
+            size_hint_y=None,
+            height=40,
+            color=(0.2, 0.4, 0.8, 1),
+            font_size='16sp'
+        )
+        scroll_layout.add_widget(header_label)
+        
+        # Info text
+        info_label = Label(
+            text='Route traffic through Orbot (official Tor app) for anonymity.\n'
+                 'Ensure Orbot is installed and running before enabling.',
+            size_hint_y=None,
+            height=60,
+            color=(0.3, 0.3, 0.3, 1),
+            font_size='12sp',
+            halign='left',
+            valign='middle',
+            text_size=(None, None)
+        )
+        info_label.bind(size=lambda *x: setattr(info_label, 'text_size', (info_label.width, None)))
+        scroll_layout.add_widget(info_label)
+        
+        # Enable Tor Routing
+        tor_enable_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=40)
+        tor_enable_layout.add_widget(Label(text='Enable Tor Routing:', size_hint_x=0.5, color=(0, 0, 0, 1)))
+        self.tor_enabled_checkbox = CheckBox(active=False, size_hint_x=0.5)
+        self.tor_enabled_checkbox.bind(active=self.on_tor_toggle)
+        tor_enable_layout.add_widget(self.tor_enabled_checkbox)
+        scroll_layout.add_widget(tor_enable_layout)
+        
+        # Fail-Closed Mode
+        fail_closed_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=40)
+        fail_closed_layout.add_widget(Label(text='Fail-Closed Mode:', size_hint_x=0.5, color=(0, 0, 0, 1)))
+        self.fail_closed_checkbox = CheckBox(active=True, size_hint_x=0.5)
+        fail_closed_layout.add_widget(self.fail_closed_checkbox)
+        scroll_layout.add_widget(fail_closed_layout)
+        
+        # Fail-closed info
+        fail_info_label = Label(
+            text='(Block network if Tor disconnects)',
+            size_hint_y=None,
+            height=25,
+            color=(0.5, 0.5, 0.5, 1),
+            font_size='11sp'
+        )
+        scroll_layout.add_widget(fail_info_label)
+        
+        # SOCKS Host
+        host_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=40)
+        host_layout.add_widget(Label(text='SOCKS Host:', size_hint_x=0.3, color=(0, 0, 0, 1)))
+        self.tor_host_input = TextInput(
+            text='127.0.0.1',
+            multiline=False,
+            size_hint_x=0.7
+        )
+        host_layout.add_widget(self.tor_host_input)
+        scroll_layout.add_widget(host_layout)
+        
+        # SOCKS Port
+        port_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=40)
+        port_layout.add_widget(Label(text='SOCKS Port:', size_hint_x=0.3, color=(0, 0, 0, 1)))
+        self.tor_port_input = TextInput(
+            text='9050',
+            multiline=False,
+            size_hint_x=0.7,
+            input_filter='int'
+        )
+        port_layout.add_widget(self.tor_port_input)
+        scroll_layout.add_widget(port_layout)
+        
+        # Status indicator
+        status_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=40)
+        status_layout.add_widget(Label(text='Status:', size_hint_x=0.3, color=(0, 0, 0, 1)))
+        self.tor_status_label = Label(
+            text='Disabled',
+            size_hint_x=0.7,
+            color=(0.5, 0.5, 0.5, 1),
+            halign='left'
+        )
+        self.tor_status_label.bind(size=lambda *x: setattr(self.tor_status_label, 'text_size', (self.tor_status_label.width, None)))
+        status_layout.add_widget(self.tor_status_label)
+        scroll_layout.add_widget(status_layout)
+        
+        scroll.add_widget(scroll_layout)
+        layout.add_widget(scroll)
+        
+        # Test Connection button
+        test_btn = Button(
+            text='Test Tor Connection',
+            size_hint=(1, 0.1),
+            background_color=(0.3, 0.5, 0.7, 1),
+            color=(1, 1, 1, 1)
+        )
+        test_btn.bind(on_press=self.test_tor_connection)
+        layout.add_widget(test_btn)
+        
+        # Save Settings button
+        save_btn = Button(
+            text='Save Tor Settings',
+            size_hint=(1, 0.1),
+            background_color=(0.2, 0.6, 0.2, 1),
+            color=(1, 1, 1, 1)
+        )
+        save_btn.bind(on_press=self.save_tor_settings)
+        layout.add_widget(save_btn)
+        
+        return layout
+    
+    def on_tor_toggle(self, checkbox, value):
+        """Handle Tor routing toggle."""
+        if orbot_manager is None:
+            self.update_tor_status("Error: Orbot module not available", error=True)
+            checkbox.active = False
+            return
+        
+        if value:
+            self.update_tor_status("Enabled (not verified)", warning=True)
+        else:
+            self.update_tor_status("Disabled")
+            disable_tor_routing()
+    
+    def update_tor_status(self, text, error=False, warning=False, success=False):
+        """Update Tor status label (thread-safe)."""
+        def update(dt):
+            self.tor_status_label.text = text
+            if error:
+                self.tor_status_label.color = (0.8, 0.2, 0.2, 1)
+            elif warning:
+                self.tor_status_label.color = (0.8, 0.6, 0.2, 1)
+            elif success:
+                self.tor_status_label.color = (0.2, 0.7, 0.2, 1)
+            else:
+                self.tor_status_label.color = (0.5, 0.5, 0.5, 1)
+        Clock.schedule_once(update)
+    
+    def test_tor_connection(self, instance):
+        """Test Tor/Orbot connection."""
+        if orbot_manager is None:
+            self.update_tor_status("Error: Orbot module not available", error=True)
+            self.append_to_results("\n[TOR] Error: Orbot module not loaded. Install PySocks.")
+            return
+        
+        # Run test in background thread
+        thread = threading.Thread(target=self._test_tor_thread)
+        thread.daemon = True
+        thread.start()
+    
+    def _test_tor_thread(self):
+        """Test Tor connection in background thread."""
+        try:
+            host = self.tor_host_input.text.strip() or "127.0.0.1"
+            port_text = self.tor_port_input.text.strip() or "9050"
+            
+            try:
+                port = int(port_text)
+                if port < 1 or port > 65535:
+                    raise ValueError("Port out of range")
+            except ValueError:
+                self.update_tor_status("Invalid port number", error=True)
+                self.append_to_results(f"\n[TOR] Error: Invalid port '{port_text}'. Port must be between 1-65535.")
+                return
+            
+            self.update_tor_status("Testing connection...", warning=True)
+            self.append_to_results(f"\n[TOR] Testing Orbot connection at {host}:{port}...")
+            
+            # Configure orbot manager for testing
+            orbot_manager.host = host
+            orbot_manager.port = port
+            orbot_manager.fail_closed = False  # Don't fail during test
+            
+            # Test Orbot proxy
+            if orbot_manager.verify_orbot_running():
+                self.append_to_results("[TOR] Orbot SOCKS5 proxy is accessible!")
+                
+                # Test Tor network connection
+                if orbot_manager.verify_tor_connection():
+                    self.update_tor_status("Connected to Tor!", success=True)
+                    self.append_to_results("[TOR] Successfully verified Tor network connection!")
+                else:
+                    self.update_tor_status("Orbot running, Tor not verified", warning=True)
+                    self.append_to_results("[TOR] Warning: Orbot accessible but Tor network not verified.")
+            else:
+                self.update_tor_status("Orbot not running", error=True)
+                self.append_to_results(f"[TOR] Error: Cannot connect to Orbot at {host}:{port}")
+                self.append_to_results("[TOR] Please ensure Orbot is installed and running.")
+                
+        except OrbotNotRunningError as e:
+            self.update_tor_status("Orbot not running", error=True)
+            self.append_to_results(f"[TOR] Error: {str(e)}")
+        except TorNetworkError as e:
+            self.update_tor_status("Tor network error", error=True)
+            self.append_to_results(f"[TOR] Error: {str(e)}")
+    
+    def save_tor_settings(self, instance):
+        """Save and apply Tor settings."""
+        if orbot_manager is None:
+            self.update_tor_status("Error: Orbot module not available", error=True)
+            self.append_to_results("\n[TOR] Error: Orbot module not loaded.")
+            return
+        
+        host = self.tor_host_input.text.strip() or "127.0.0.1"
+        port_text = self.tor_port_input.text.strip() or "9050"
+        
+        try:
+            port = int(port_text)
+            if port < 1 or port > 65535:
+                raise ValueError("Port out of range")
+        except ValueError:
+            self.update_tor_status("Invalid port number", error=True)
+            self.append_to_results(f"\n[TOR] Error: Invalid port '{port_text}'. Port must be between 1-65535.")
+            return
+        
+        enabled = self.tor_enabled_checkbox.active
+        fail_closed = self.fail_closed_checkbox.active
+        
+        try:
+            if enabled:
+                try:
+                    enable_tor_routing(host=host, port=port, fail_closed=fail_closed)
+                    self.update_tor_status("Tor routing enabled", success=True)
+                    self.append_to_results(f"\n[TOR] Tor routing enabled via {host}:{port}")
+                    if fail_closed:
+                        self.append_to_results("[TOR] Fail-closed mode: Network blocked if Tor disconnects")
+                except OrbotNotRunningError as e:
+                    self.update_tor_status("Orbot not running", error=True)
+                    self.append_to_results(f"\n[TOR] Error: {str(e)}")
+                    self.tor_enabled_checkbox.active = False
+            else:
+                disable_tor_routing()
+                self.update_tor_status("Disabled")
+                self.append_to_results("\n[TOR] Tor routing disabled")
+        except TorNetworkError as e:
+            self.update_tor_status("Tor network error", error=True)
+            self.append_to_results(f"\n[TOR] Error: {str(e)}")
+
     def on_action_change(self, spinner, text):
         """Handle action selection changes to show/hide relevant fields"""
         # Reset all conditional layouts
@@ -342,12 +612,27 @@ class GhauriApp(App):
     def _run_scan_thread(self):
         """Execute Ghauri scan in background thread"""
         try:
+            # Check if Tor routing is enabled and verify connection
+            if orbot_manager is not None and orbot_manager.enabled:
+                try:
+                    orbot_manager.ensure_tor_or_fail()
+                    self.append_to_results("[TOR] Routing traffic through Tor network...")
+                except (OrbotNotRunningError, TorNetworkError) as e:
+                    self.append_to_results(f"[TOR] Error: {str(e)}")
+                    self.append_to_results("[TOR] Scan aborted due to fail-closed mode.")
+                    return
+            
             # Prepare arguments
             url = self.url_input.text.strip()
             data = self.data_input.text.strip() or None
             cookie = self.cookie_input.text.strip() or ""
             proxy = self.proxy_input.text.strip() or ""
             user_agent = self.ua_input.text.strip() or ""
+            
+            # Use Tor proxy if enabled and no custom proxy specified
+            if orbot_manager is not None and orbot_manager.enabled and not proxy:
+                proxy = orbot_manager.socks_proxy_url
+                self.append_to_results(f"[TOR] Using SOCKS5 proxy: {proxy}")
             
             # Get DBMS
             dbms_map = {
